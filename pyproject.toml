@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=42", "wheel", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atol-reference-data-lookups"
+dynamic = ["version"]
+description = "Look up reference datasets by NCBI TaxId"
+readme = "README.md"
+authors = [
+    { name = "Tom Harrop", email = "tharrop@unimelb.edu.au" },
+    { name = "Jane Tung", email = "jane.tung@uq.edu.au" },
+]
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Natural Language :: English",
+    "Operating System :: POSIX :: Linux",
+    "Private :: Do Not Upload",
+    "Programming Language :: Python :: 3.12",
+]
+requires-python = ">=3.14,<3.15"
+dependencies = []
+
+[project.urls]
+"Homepage" = "https://github.com/TomHarrop/atol-reference-data-lookups"
+
+[project.scripts]
+atol-reference-data-lookups = "atol_reference_data_lookups.atol_reference_data_lookups:main"
+get-remote-files = "get_remote_files.get_remote_files:main"
+
+[tool.setuptools.package-data]
+"get_remote_files" = ["workflow/Snakefile", "workflow/rules/*.smk"]
+
+[tool.setuptools_scm]
