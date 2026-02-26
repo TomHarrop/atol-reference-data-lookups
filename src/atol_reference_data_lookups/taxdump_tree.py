@@ -174,6 +174,100 @@ def get_node(tree, taxid):
         logger.warning(f"Node for taxid {taxid} not found in tree.")
 
 
+def generate_augustus_tree(
+    tree, taxids_to_augustus_dataset_mapping, cache_dir, update_tree=False
+):
+
+    cache_file = Path(cache_dir, "augustus_tree.db")
+    taxids_to_augustus_dataset_mapping_checksum = compute_sha256(
+        taxids_to_augustus_dataset_mapping
+    )
+
+    logger.info(
+        f"Reading Augustus dataset mapping from {taxids_to_augustus_dataset_mapping}"
+    )
+    augustus_mapping = read_augustus_mapping(taxids_to_augustus_dataset_mapping)
+    logger.info(
+        f"    ... found {len(augustus_mapping.keys())} datasets in Augustus mapping file"
+    )
+
+    with shelve.open(cache_file) as cache:
+        if (
+            "augustus_tree" in cache
+            and "augustus_tip_names" in cache
+            and "taxids_to_augustus_dataset_mapping_checksum" in cache
+            and cache["taxids_to_augustus_dataset_mapping_checksum"]
+            == taxids_to_augustus_dataset_mapping_checksum
+            and not update_tree
+        ):
+            logger.info(f"Reading Augustus tree from {cache_file}")
+            return augustus_mapping, cache["augustus_tree"], cache["augustus_tip_names"]
+
+        else:
+            logger.info(f"Pruning tree for Augustus datasets")
+            augustus_tree = tree.copy(deep=True)
+            initial_node_count = int(augustus_tree.count())
+
+            # Shear works on tips but not all Augustus nodes are tips. We
+            # need to remove all descendants of the Augustus nodes first.
+            augustus_nodes = [
+                get_node(augustus_tree, x) for x in augustus_mapping.keys()
+            ]
+            augustus_node_names = [x.name for x in augustus_nodes]
+            logger.debug(
+                f"Found {len(augustus_node_names)} Augustus taxids in tree:\n{augustus_node_names}"
+            )
+
+            for node in augustus_nodes:
+                if node.has_children():
+                    node_children = node.children
+                    logger.debug(
+                        f"Node {node.name} has children {[x.name for x in node_children]}"
+                    )
+                    logger.debug(f"\n{node.ascii_art()}")
+                    # I don't know why, but this sometimes leaves one child.
+                    for child in node_children:
+                        logger.debug(f"Removing node {child.name}")
+                        removed = node.remove(child)
+                        logger.debug(f"Removed? {removed}")
+
+                    # Running pop removes the remaining child.
+                    if not node.is_tip():
+                        node.pop()
+
+                logger.debug(f"Is node {node.name} a tip? {node.is_tip()}")
+                logger.debug(f"\n{node.ascii_art()}")
+
+            # Now we can shear the tree
+            sheared_augustus_tree = augustus_tree.shear(
+                names=augustus_node_names,
+                prune=False,
+                inplace=False,
+                strict=False,
+            )
+
+            final_node_count = int(sheared_augustus_tree.count())
+            nodes_removed = initial_node_count - final_node_count
+
+            logger.debug(f"    ... NCBI tree had {initial_node_count} nodes.")
+            logger.debug(f"    ... Removed {nodes_removed} nodes.")
+            logger.debug(f"    ... Augustus tree has {final_node_count} nodes.")
+
+            logger.debug("Getting tip names of the Augustus tree")
+            augustus_tip_names = [x.name for x in sheared_augustus_tree.tips()]
+            logger.debug(f"    ... {augustus_tip_names}")
+
+            logger.info("Caching the pruned Augustus tree")
+
+            cache["augustus_tree"] = sheared_augustus_tree
+            cache["augustus_tip_names"] = augustus_tip_names
+            cache["taxids_to_augustus_dataset_mapping_checksum"] = (
+                taxids_to_augustus_dataset_mapping_checksum
+            )
+
+            return augustus_mapping, sheared_augustus_tree, augustus_tip_names
+
+
 class TaxdumpTree:
 
     def __init__(
@@ -235,68 +329,11 @@ class TaxdumpTree:
             f"    ... found {len(self.busco_mapping.keys())} datasets in BUSCO mapping file"
         )
 
-        logger.info(
-            f"Reading Augustus dataset mapping from {taxids_to_augustus_dataset_mapping}"
+        self.augustus_mapping, self.augustus_tree, self.augustus_tip_names = (
+            generate_augustus_tree(
+                self.tree, taxids_to_augustus_dataset_mapping, cache_dir, update_tree
+            )
         )
-        self.augustus_mapping = read_augustus_mapping(
-            taxids_to_augustus_dataset_mapping
-        )
-        logger.info(
-            f"    ... found {len(self.augustus_mapping.keys())} datasets in Augustus mapping file"
-        )
-
-        logger.info(f"Generating tree for Augustus datasets")
-        augustus_tree = self.tree.copy(deep=True)
-        initial_node_count = int(augustus_tree.count())
-
-        # Shear works on tips but not all Augustus nodes are tips. We
-        # need to remove all descendants of the Augustus nodes first.
-        augustus_nodes = [
-            get_node(augustus_tree, x) for x in self.augustus_mapping.keys()
-        ]
-        augustus_node_names = [x.name for x in augustus_nodes]
-        logger.debug(
-            f"Found {len(augustus_node_names)} Augustus taxids in tree:\n{augustus_node_names}"
-        )
-
-        for node in augustus_nodes:
-            if node.has_children():
-                node_children = node.children
-                logger.debug(
-                    f"Node {node.name} has children {[x.name for x in node_children]}"
-                )
-                logger.debug(f"\n{node.ascii_art()}")
-                # I don't know why, but this sometimes leaves one child.
-                for child in node_children:
-                    logger.debug(f"Removing node {child.name}")
-                    removed = node.remove(child)
-                    logger.debug(f"Removed? {removed}")
-
-                # Running pop removes the remaining child.
-                if not node.is_tip():
-                    node.pop()
-
-            logger.debug(f"Is node {node.name} a tip? {node.is_tip()}")
-            logger.debug(f"\n{node.ascii_art()}")
-
-        # Now we can shear the tree
-        self.augustus_tree = augustus_tree.shear(
-            names=augustus_node_names,
-            prune=False,
-            inplace=False,
-            strict=False,
-        )
-
-        final_node_count = int(self.augustus_tree.count())
-        nodes_removed = initial_node_count - final_node_count
-
-        logger.debug(f"    ... NCBI tree had {initial_node_count} nodes.")
-        logger.debug(f"    ... Removed {nodes_removed} nodes.")
-        logger.debug(f"    ... Augustus tree has {final_node_count} nodes.")
-
-        logger.debug("Getting tip names of the Augustus tree")
-        self.augustus_tip_names = [x.name for x in self.augustus_tree.tips()]
-        logger.debug(f"    ... {self.augustus_tip_names}")
 
     def get_authority_txt(self, taxid):
         return self.authority_dict.get(taxid, None)
