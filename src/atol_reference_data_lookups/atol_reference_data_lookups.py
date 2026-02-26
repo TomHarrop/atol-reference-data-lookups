@@ -1,6 +1,9 @@
-from pathlib import Path
+from .taxdump_tree import TaxdumpTree
+from atol_reference_data_lookups import logger
 from argparse import ArgumentParser
+from pathlib import Path
 import importlib.resources as pkg_resources
+import os
 
 
 def parse_args():
@@ -10,6 +13,7 @@ def parse_args():
     parser = ArgumentParser()
 
     input_group = parser.add_argument_group("Input")
+    options_group = parser.add_argument_group("General options")
 
     input_group.add_argument(
         "--nodes", required=True, help="NCBI nodes.dmp file from taxdump", type=Path
@@ -33,11 +37,28 @@ def parse_args():
         type=Path,
     )
 
+    options_group.add_argument(
+        "--cache_dir",
+        help="Directory to cache the NCBI taxonomy after processing",
+        default=Path(
+            os.getenv("XDG_CACHE_HOME", os.path.expanduser("~/.cache")),
+            "atol_reference_data_lookups",
+        ),
+    )
+
     return parser.parse_args()
 
 
 def main():
 
-    parse_args()
+    args = parse_args()
 
-    raise ValueError("Here we are")
+    taxump_tree = TaxdumpTree(
+        args.nodes,
+        args.names,
+        args.taxids_to_busco_dataset_mapping,
+        args.taxids_to_augustus_dataset_mapping,
+        args.cache_dir,
+    )
+
+    raise ValueError(taxump_tree)

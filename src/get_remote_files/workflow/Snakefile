@@ -3,3 +3,10 @@
 
 include: "rules/pull_busco_mapping.smk"
 include: "rules/pull_ncbi_taxonomy.smk"
+
+
+rule target:
+    default_target: True
+    input:
+        rules.download_busco_placement_file.output,
+        rules.expand_taxdump.output,

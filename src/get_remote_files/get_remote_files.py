@@ -23,7 +23,6 @@ def parse_arguments():
     parser.add_argument(
         "--parallel_downloads", type=int, help="Number of parallel downloads", default=1
     )
-    parser.add_argument("manifest_file", type=Path, help="Path to the manifest")
 
     return parser.parse_args()
 
@@ -31,7 +30,7 @@ def parse_arguments():
 def main():
 
     # print version info
-    pkg_metadata = metadata("atol-genome-launcher")
+    pkg_metadata = metadata("atol-reference-data-lookups")
     pkg_name = pkg_metadata.get("Name")
     pkg_version = pkg_metadata.get("Version")
 

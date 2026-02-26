@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
-from .io import read_gzip_textfile
-from .logger import logger
+from atol_reference_data_lookups import logger
 from pathlib import Path
 from skbio.tree import TreeNode
 import hashlib
@@ -9,6 +8,7 @@ import pandas as pd
 import re
 import shelve
 import skbio.io
+import tarfile
 
 
 def sanitise_string(string):
@@ -139,6 +139,27 @@ def read_busco_mapping(taxids_to_busco_dataset_mapping):
     return taxid_to_dataset
 
 
+def _extract_tarfile(file_path):
+    with tarfile.open(file_path, "r:gz") as tar:
+        for member in tar.getmembers():
+            if member.isfile() and not member.name.startswith("."):
+                for line in tar.extractfile(member).read().decode().splitlines():
+                    yield (line)
+
+
+def read_gzip_textfile(file_path):
+    file_string = file_path.as_posix()
+    if file_string.endswith(".tar.gz") or file_string.endswith(".tgz"):
+        f = _extract_tarfile(file_path)
+    else:
+        f = gzip.open(file_path, "rt")
+
+    for i, line in enumerate(f, 1):
+        if "\x00" in line:
+            raise ValueError(f"Null bytes at line {i} of {file_path}")
+        yield line
+
+
 def get_node(tree, taxid):
     try:
         node = tree.find(int(taxid))
@@ -153,7 +174,7 @@ def get_node(tree, taxid):
         logger.warning(f"Node for taxid {taxid} not found in tree.")
 
 
-class NcbiTaxdump:
+class TaxdumpTree:
 
     def __init__(
         self,
