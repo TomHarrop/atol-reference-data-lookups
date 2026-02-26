@@ -16,11 +16,6 @@ def sanitise_string(string):
     return "".join(allowed_chars.findall(re.sub(r"\s+", " ", string))).strip()
 
 
-def remove_whitespace(string):
-    allowed_chars = re.compile("[a-zA-Z0-9]")
-    return re.sub(r"[^a-zA-Z0-9]+", "_", string)
-
-
 def compute_sha256(file_path):
     logger.debug(f"Computing sha256 checksum for {file_path}.")
     sha256 = hashlib.sha256()
@@ -96,27 +91,6 @@ def recursive_find_lower_ranks(
     return rank_list
 
 
-def split_scientific_name(scientific_name, null_values):
-    my_scientific_name = sanitise_string(scientific_name)
-    if my_scientific_name.upper() in null_values:
-        logger.debug(f"{my_scientific_name} matched null_values")
-        return None
-
-    name_parts = [sanitise_string(x) for x in my_scientific_name.split(" ")]
-
-    if not len(name_parts) == 2:
-        logger.debug(f"Length of {name_parts} is not 2")
-        return None
-
-    for part in name_parts:
-        if part.upper() in null_values:
-            logger.debug(f"Name part {part} matched null_values")
-            return None
-
-    logger.debug(f"Parsed {name_parts} from {scientific_name}")
-    return name_parts
-
-
 def read_augustus_mapping(taxids_to_augustus_dataset_mapping):
     taxid_to_dataset = {}
     with open(taxids_to_augustus_dataset_mapping, "rt") as f:
@@ -152,6 +126,8 @@ def read_gzip_textfile(file_path):
     if file_string.endswith(".tar.gz") or file_string.endswith(".tgz"):
         f = _extract_tarfile(file_path)
     else:
+        import gzip
+
         f = gzip.open(file_path, "rt")
 
     for i, line in enumerate(f, 1):
@@ -467,166 +443,3 @@ class TaxdumpTree:
             )
 
             return self.augustus_mapping[closest_dataset]
-
-
-class OrganismSection(dict):
-
-    def __init__(self, package_id, package_data, ncbi_taxdump, null_values=None):
-
-        # look up taxon_id in NCBI taxonomy
-        self.check_ncbi_taxonomy_for_taxon_id(ncbi_taxdump)
-
-        # Check for species information in the raw metadata. Realistically, we
-        # can only do this if we can parse the scientific name into a Genus and
-        # Species, or get that information from the Genus and Species fields,
-        # and the names table has a single exact match at the species level.
-        # Otherwise, too risky?
-        self.taxid_retrieved_from_metadata = False
-        if not self.scientific_name:
-            self.check_bpa_metadata_for_species_information(
-                ncbi_taxdump, package_id, null_values
-            )
-
-        self.check_for_subspecies_information(ncbi_taxdump, package_id, null_values)
-
-        # generate a key for grouping the organisms and lookup lineage information
-        if self.has_taxid_at_accepted_level and self.scientific_name_source == "ncbi":
-
-            ancestor_taxids = ncbi_taxdump.get_ancestor_taxids(self.taxon_id)
-
-            tax_string = ncbi_taxdump.get_taxonomy_string(ancestor_taxids)
-
-            if self.authority:
-                self.tax_string = f"{tax_string}; {self.authority}"
-            else:
-                self.tax_string = f"{tax_string}; {self.scientific_name}"
-
-            self.ncbi_order, self.ncbi_family = ncbi_taxdump.get_order_and_family(
-                ancestor_taxids
-            )
-
-            self.busco_dataset_name = ncbi_taxdump.get_busco_lineage(
-                self.taxon_id, ancestor_taxids
-            )
-            logger.debug(f"Found BUSCO dataset {self.busco_dataset_name}")
-            self.augustus_dataset_name = ncbi_taxdump.get_augustus_lineage(
-                self.taxon_id, ancestor_taxids
-            )
-            logger.debug(f"Found Augustus dataset {self.augustus_dataset_name}")
-        else:
-            self.organism_grouping_key = None
-
-        logger.debug(f"OrganismSection\nProperties: {self}\ndict: {self.__dict__}")
-        self.mapped_metadata = self.__dict__
-
-    def check_bpa_metadata_for_species_information(
-        self, ncbi_taxdump, package_id, null_values
-    ):
-        bpa_scientific_name = sanitise_string(str(self.get("scientific_name")))
-        retrieved_taxid = None
-
-        # check whatever's in the scientific name field
-        logger.debug(f"Attempting to parse scientific name {bpa_scientific_name}")
-        name_parts = split_scientific_name(bpa_scientific_name, null_values)
-
-        if name_parts:
-            retrieved_taxid = ncbi_taxdump.search_by_binomial_name(
-                name_parts[0],
-                name_parts[1],
-                package_id,
-            )
-        else:
-            logger.debug(f"Gave up on scientific name {bpa_scientific_name}")
-
-        if not retrieved_taxid:
-            # check if we have genus and species fields
-            genus = sanitise_string(str(self.get("genus")))
-            species = sanitise_string(str(self.get("species")))
-
-            if genus.upper() not in null_values and species.upper() not in null_values:
-                logger.debug(
-                    f"Attempting to parse separate genus {genus} and species {species}"
-                )
-                retrieved_taxid = ncbi_taxdump.search_by_binomial_name(
-                    genus,
-                    species,
-                    package_id,
-                )
-
-        if not retrieved_taxid:
-            logger.debug(
-                f"Could not match metadata to taxid at accepted level for package {package_id}"
-            )
-
-        # process the results
-        if retrieved_taxid:
-            logger.debug(f"Found single taxid at accepted level {retrieved_taxid}")
-            self.taxon_id = retrieved_taxid
-            self.has_taxid = True
-            self.taxid_retrieved_from_metadata = True
-
-            self.check_ncbi_taxonomy_for_taxon_id(ncbi_taxdump)
-            logger.debug(
-                f"Assigning scientific name {self.scientific_name} to package {package_id}"
-            )
-
-    def check_for_subspecies_information(self, ncbi_taxdump, package_id, null_values):
-        # some taxids resolve lower than species, use these first
-        if (
-            self.has_taxid_at_accepted_level
-            and self.rank != ncbi_taxdump.resolve_to_rank
-        ):
-            self.has_subspecies_information = True
-            self.atol_scientific_name = self.scientific_name
-            self.subspecies_source = "ncbi"
-            return
-
-        # try to resolve the subspecies information manually
-        if (
-            self.scientific_name
-            and str(self.get("infraspecific_epithet")).upper() not in null_values
-        ):
-            logger.debug(
-                f'{package_id} has subspecies information but taxon_id {self.taxon_id} rank "{self.rank}" is not lower than "{ncbi_taxdump.resolve_to_rank}"'
-            )
-            logger.debug("Accepted ranks: {ncbi_taxdump.accepted_ranks}")
-            self.has_subspecies_information = True
-            self.subspecies_source = "parsed"
-
-            # Using the BPA subspecies info is disabled, see
-            # https://github.com/TomHarrop/atol-bpa-datamapper/issues/26
-            # subspecies_sanitised = sanitise_string(self.get("infraspecific_epithet"))
-            # self.atol_scientific_name = " ".join(
-            #     [self.scientific_name, subspecies_sanitised]
-            # )
-            # logger.debug("Assigning {self.atol_scientific_name}")
-            self.atol_scientific_name = self.scientific_name
-            return
-
-        self.atol_scientific_name = self.scientific_name
-        self.has_subspecies_information = False
-        self.subspecies_source = None
-
-    def check_ncbi_taxonomy_for_taxon_id(self, ncbi_taxdump):
-        # Check if it's an NCBI taxid
-        self.taxid_is_ncbi_node = (
-            self.has_taxid and self.taxon_id in ncbi_taxdump.nodes.index
-        )
-
-        if self.taxid_is_ncbi_node:
-            self.rank = ncbi_taxdump.get_rank(self.taxon_id)
-            self.scientific_name = ncbi_taxdump.get_scientific_name_txt(self.taxon_id)
-            self.scientific_name_source = "ncbi"
-
-            self.ncbi_common_name = ncbi_taxdump.get_common_name_txt(self.taxon_id)
-            self.authority = ncbi_taxdump.get_authority_txt(self.taxon_id)
-
-        else:
-            self.rank = None
-            self.scientific_name = None
-            self.scientific_name_source = None
-
-            self.ncbi_common_name = None
-            self.authority = None
-
-        self.has_taxid_at_accepted_level = self.rank in ncbi_taxdump.accepted_ranks

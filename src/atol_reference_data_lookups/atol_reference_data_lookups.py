@@ -4,6 +4,8 @@ from argparse import ArgumentParser
 from pathlib import Path
 import importlib.resources as pkg_resources
 import os
+import sys
+import json
 
 
 def parse_args():
@@ -83,6 +85,10 @@ def read_taxid_list(taxid_list_file):
     return taxid_list
 
 
+def write_json_output(data_dict):
+    json.dump(data_dict, sys.stdout)
+
+
 def main():
 
     args = parse_args()
@@ -104,12 +110,12 @@ def main():
     for query_taxid in query_taxids:
         ancestor_taxids = taxdump_tree.get_ancestor_taxids(query_taxid)
         taxonomy_reference_data[query_taxid] = {
-            "busco_lineage": taxdump_tree.get_busco_lineage(
+            "busco_dataset_name": taxdump_tree.get_busco_lineage(
                 query_taxid, ancestor_taxids
             ),
-            "augustus_dataset": taxdump_tree.get_augustus_lineage(
+            "augustus_dataset_name": taxdump_tree.get_augustus_lineage(
                 query_taxid, ancestor_taxids
             ),
         }
 
-    raise ValueError(taxonomy_reference_data)
+    write_json_output(taxonomy_reference_data)
