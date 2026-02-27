@@ -9,8 +9,6 @@ changelog: CHANGELOG.md
 get_remote_files:
 	get-remote-files --help
 
-
-
 test: test_taxid test_tax_list
 
 test_taxid:
@@ -30,12 +28,12 @@ test_tax_list:
 		> test-output/test_tax_list.json
 
 CHANGELOG.md: .git/index
-        gitchangelog > $(tmpdir)/CHANGELOG.md
-        apptainer exec docker://davidanson/markdownlint-cli2:v0.13.0 \
-        markdownlint-cli2 \
-        --fix \
-        :$(tmpdir)/CHANGELOG.md || true
-        mv $(tmpdir)/CHANGELOG.md ./CHANGELOG.md
-        git add CHANGELOG.md
-        git commit -m 'changelog !cosmetic'
-        git push origin $(branch)
+	gitchangelog > $(tmpdir)/CHANGELOG.md
+	apptainer exec docker://davidanson/markdownlint-cli2:v0.13.0 \
+		markdownlint-cli2 \
+		--fix \
+		:$(tmpdir)/CHANGELOG.md || true
+	mv $(tmpdir)/CHANGELOG.md ./CHANGELOG.md
+	git add CHANGELOG.md
+	git commit -m 'changelog !cosmetic'
+	git push origin $(branch)

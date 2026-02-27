@@ -34,19 +34,19 @@ It prints the results of the lookups to Standard Output in JSON format , *e.g.*
 {"172942": {"busco_dataset_name": "sauropsida", "augustus_dataset_name": "Xenopus_tropicalis", "genetic_code_id": 1, "mitochondrial_genetic_code_id": 2}}
 ```
 
-You also need to pass some reference data. 
+You also need to provide some reference data. 
 
-> [!TIP]
-> A convenience script to download all the reference data is [included](README.md#reference-data).
+> [!TIP] A convenience script to download the reference data is
+> [included](README.md#reference-data).
 
-- The *nodes* and *names* files are "nodes.dmp" and "names.dmp" from NCBI's
+
+- The **nodes** and **names** files are "nodes.dmp" and "names.dmp" from NCBI's
   [new_taxdump](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/new_taxdump/). 
-- *taxids_to_busco_dataset_mapping* is the "mapping_taxids-busco_dataset_name"
+- **taxids_to_busco_dataset_mapping** is the "mapping_taxids-busco_dataset_name"
   file from
   [busco-data.ezlab.org/v5/data/placement_files](https://busco-data.ezlab.org/v5/data/placement_files/).
-- *taxids_to_augustus_dataset_mapping* is a mapping of Augustus training
-  datasets to NCBI TaxID, [provided in this
-  repo](src/atol_reference_data_lookups/config/taxid_to_augustus_dataset.tsv).
+- **taxids_to_augustus_dataset_mapping** is a mapping of Augustus training
+  datasets to NCBI TaxID, [shipped with the package](src/atol_reference_data_lookups/config/taxid_to_augustus_dataset.tsv).
 
 
 ```
@@ -79,18 +79,19 @@ General options:
 
 `atol-reference-data-lookups` uses
 [`skbio.tree`](https://scikit.bio/docs/latest/tree.html) to import the NCBI
-Taxdump and build the query trees. This process is slow, but the results are
+Taxdump and build the query trees. This takes a while, but the results are
 automatically cached on the first run to speed up following runs. After the
 trees are loaded into memory, searches are fast.
 
 Override the default cache directory with the `--cache_dir` argument.
 
-The cache is automatically invalidated if any of the input files change.
+The cache is automatically invalidated if any of the reference data files
+change.
 
 ### Reference data
 
 Download the reference data by running `get-remote-files`. Files will be
-downloaded to the `resources` directory. This is hard-coded.
+downloaded to the `./resources` directory. This is hard-coded.
 
 ```
 atol-reference-data-lookups version 0.1.dev13+gcbdbebe90.d20260226
