@@ -36,8 +36,8 @@ It prints the results of the lookups to Standard Output in JSON format , *e.g.*
 
 You also need to provide some reference data. 
 
-> [!TIP] A convenience script to download the reference data is
-> [included](README.md#reference-data).
+> [!TIP] 
+> A convenience script to download the reference data is [included](./README.md#reference-data).
 
 
 - The **nodes** and **names** files are "nodes.dmp" and "names.dmp" from NCBI's
