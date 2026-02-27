@@ -110,6 +110,10 @@ def main() -> None:
     taxonomy_reference_data = {}
     for query_taxid in query_taxids:
         ancestor_taxids = taxdump_tree.get_ancestor_taxids(query_taxid)
+        genetic_code_id, mitochondrial_genetic_code_id = taxdump_tree.get_genetic_codes(
+            query_taxid
+        )
+
         taxonomy_reference_data[query_taxid] = {
             "busco_dataset_name": taxdump_tree.get_busco_lineage(
                 query_taxid, ancestor_taxids
@@ -117,6 +121,8 @@ def main() -> None:
             "augustus_dataset_name": taxdump_tree.get_augustus_lineage(
                 query_taxid, ancestor_taxids
             ),
+            "genetic_code_id": int(genetic_code_id),
+            "mitochondrial_genetic_code_id": int(mitochondrial_genetic_code_id),
         }
 
     logger.info("Finished lookups")

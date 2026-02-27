@@ -41,6 +41,32 @@ def read_taxdump_file(file_path, cache_dir, scheme):
             return (data, True)
 
 
+def read_taxdump_nodes(file_path, cache_dir):
+    """
+    Read the full nodes.dmp file into a DataFrame indexed by tax_id,
+    with caching.
+    """
+    cache_file = Path(cache_dir, "nodes_full_df.db")
+    nodes_full_df_checksum = compute_sha256(file_path)
+
+    with shelve.open(cache_file) as cache:
+        if (
+            "nodes_full_df" in cache
+            and "nodes_full_df_checksum" in cache
+            and cache["nodes_full_df_checksum"] == nodes_full_df_checksum
+        ):
+            logger.info(f"Reading full nodes from cache {cache_file}")
+            return (cache["nodes_full_df"], False)
+        else:
+            data = skbio.io.read(
+                file_path, "taxdump", into=pd.DataFrame, scheme="nodes"
+            )
+            logger.info(f"Writing full nodes to cache {cache_file}")
+            cache["nodes_full_df"] = data
+            cache["nodes_full_df_checksum"] = nodes_full_df_checksum
+            return (data, True)
+
+
 def generate_taxonomy_tree(names, nodes, cache_dir, update_tree=False):
     cache_file = Path(cache_dir, "taxonomy_tree.db")
     with shelve.open(cache_file) as cache:

@@ -9,6 +9,7 @@ from atol_reference_data_lookups.tree import (
     generate_taxonomy_tree,
     get_node,
     read_taxdump_file,
+    read_taxdump_nodes,
 )
 
 
@@ -25,6 +26,11 @@ class TaxdumpTree:
         logger.info(f"Reading NCBI taxonomy from {nodes_file}")
         self.nodes, nodes_changed = read_taxdump_file(
             nodes_file, cache_dir, "nodes_slim"
+        )
+
+        logger.info(f"Reading full NCBI nodes from {nodes_file}")
+        self.nodes_full, nodes_full_changed = read_taxdump_nodes(
+            nodes_file, cache_dir
         )
 
         logger.info(f"Reading NCBI taxon names from {names_file}")
@@ -119,3 +125,14 @@ class TaxdumpTree:
         )
 
         return self.augustus_mapping[closest_dataset]
+
+    def get_genetic_codes(self, taxid):
+        """
+        Look up the genetic_code_id and mitochondrial_genetic_code_id for a
+        given taxid.
+
+        Returns a tuple of (genetic_code_id, mitochondrial_genetic_code_id).
+        """
+        logger.debug(f"Looking up genetic codes for taxid {taxid}")
+        row = self.nodes_full.loc[taxid]
+        return (row["genetic_code_id"], row["mitochondrial_genetic_code_id"])
