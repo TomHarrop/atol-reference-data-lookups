@@ -22,3 +22,11 @@ def setup_logger(log_level="INFO"):
 
 
 logger = setup_logger()
+
+__all__ = [
+    "atol_reference_data_lookups",
+    "cache",
+    "io",
+    "taxdump_tree",
+    "tree",
+]

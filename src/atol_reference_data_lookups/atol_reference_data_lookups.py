@@ -1,6 +1,6 @@
 from .taxdump_tree import TaxdumpTree
 from atol_reference_data_lookups import logger
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from pathlib import Path
 import importlib.resources as pkg_resources
 import os
@@ -8,7 +8,7 @@ import sys
 import json
 
 
-def parse_args():
+def parse_args() -> Namespace:
     # Note to self, this returns a Path
     package_files_path = pkg_resources.files(__package__)
 
@@ -79,18 +79,17 @@ def parse_args():
     return parser.parse_args()
 
 
-def read_taxid_list(taxid_list_file):
+def read_taxid_list(taxid_list_file: Path) -> list[int]:
     with open(taxid_list_file, "rt") as f:
         taxid_list = [int(x) for x in f.read().splitlines()]
     return taxid_list
 
 
-def write_json_output(data_dict):
+def write_json_output(data_dict: dict) -> None:
     json.dump(data_dict, sys.stdout)
 
 
-def main():
-
+def main() -> None:
     args = parse_args()
 
     if args.taxid is not None:
@@ -106,6 +105,8 @@ def main():
         args.cache_dir,
     )
 
+    logger.info(f"Looking up {len(query_taxids)} query_taxids")
+
     taxonomy_reference_data = {}
     for query_taxid in query_taxids:
         ancestor_taxids = taxdump_tree.get_ancestor_taxids(query_taxid)
@@ -117,5 +118,7 @@ def main():
                 query_taxid, ancestor_taxids
             ),
         }
+
+    logger.info("Finished lookups")
 
     write_json_output(taxonomy_reference_data)

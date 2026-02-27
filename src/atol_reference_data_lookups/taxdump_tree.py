@@ -1,247 +1,15 @@
 #!/usr/bin/env python3
 
+import skbio.tree._exception
+
 from atol_reference_data_lookups import logger
-from pathlib import Path
-from skbio.tree import TreeNode
-import hashlib
-import pandas as pd
-import re
-import shelve
-import skbio.io
-import tarfile
-
-
-def sanitise_string(string):
-    allowed_chars = re.compile("[a-zA-Z0-9 ]")
-    return "".join(allowed_chars.findall(re.sub(r"\s+", " ", string))).strip()
-
-
-def compute_sha256(file_path):
-    logger.debug(f"Computing sha256 checksum for {file_path}.")
-    sha256 = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        for block in iter(lambda: f.read(4096), b""):
-            sha256.update(block)
-    hex_digest = sha256.hexdigest()
-    logger.debug(f"Checksum: {hex_digest}")
-    return hex_digest
-
-
-def read_taxdump_file(file_path, cache_dir, scheme):
-    """
-    Reads the taxdump file and caches it in a shelve file.
-
-    Return a tuple of the data and a boolean indicating whether the cache was
-    updated.
-    """
-    cache_file = Path(cache_dir, f"{Path(file_path).stem}_{scheme}.db")
-    Path.mkdir(cache_file.parent, exist_ok=True, parents=True)
-    current_checksum = compute_sha256(file_path)
-
-    with shelve.open(cache_file) as cache:
-        if (
-            "data" in cache
-            and "checksum" in cache
-            and cache["checksum"] == current_checksum
-        ):
-            logger.info(f"Reading {scheme} from cache {cache_file}")
-            return (cache["data"], False)
-        else:
-            data = skbio.io.read(file_path, "taxdump", into=pd.DataFrame, scheme=scheme)
-            logger.info(f"Writing {scheme} to cache {cache_file}")
-            cache["data"] = data
-            cache["checksum"] = current_checksum
-            return (data, True)
-
-
-def generate_taxonomy_tree(names, nodes, cache_dir, update_tree=False):
-    cache_file = Path(cache_dir, "taxonomy_tree.db")
-    with shelve.open(cache_file) as cache:
-        if "tree" in cache and not update_tree:
-            logger.info(f"Reading taxonomy tree from {cache_file}")
-            return cache["tree"]
-        else:
-            logger.info("Generating taxonomy tree")
-            # I think omitting the names means we get taxids as names (better
-            # for searching). To include names, use
-            # `TreeNode.from_taxdump(nodes, names)`.
-            tree = TreeNode.from_taxdump(nodes)
-            logger.info("Indexing tree")
-            tree.index_tree()
-            cache["tree"] = tree
-            return tree
-
-
-def find_lower_ranks(tree, top_rank="species", excluded_ranks=["no rank"]):
-    rank_list = recursive_find_lower_ranks(tree, top_rank)
-    return [rank for rank in sorted(set(rank_list)) if rank not in excluded_ranks]
-
-
-def recursive_find_lower_ranks(
-    tree, top_rank="species", rank_list=[], top_rank_or_lower=False
-):
-    if tree.rank == top_rank:
-        top_rank_or_lower = True
-    if top_rank_or_lower:
-        for node in tree.traverse():
-            rank_list.append(node.rank)
-    else:
-        for node in tree.children:
-            recursive_find_lower_ranks(node, top_rank, rank_list, top_rank_or_lower)
-    return rank_list
-
-
-def read_augustus_mapping(taxids_to_augustus_dataset_mapping):
-    taxid_to_dataset = {}
-    with open(taxids_to_augustus_dataset_mapping, "rt") as f:
-        for i, line in enumerate(f, 1):
-            splits = line.strip().split(maxsplit=1)
-            taxid_to_dataset.update({int(splits[0]): str(splits[1])})
-
-    logger.debug(taxid_to_dataset)
-    return taxid_to_dataset
-
-
-def read_busco_mapping(taxids_to_busco_dataset_mapping):
-    dataset_mapping = read_gzip_textfile(taxids_to_busco_dataset_mapping)
-    next(dataset_mapping)  # skip the header
-    taxid_to_dataset = {}
-    for mapping in dataset_mapping:
-        splits = mapping.strip().split(maxsplit=1)
-        taxid_to_dataset.update({int(splits[0]): str(splits[1])})
-    logger.debug(taxid_to_dataset)
-    return taxid_to_dataset
-
-
-def _extract_tarfile(file_path):
-    with tarfile.open(file_path, "r:gz") as tar:
-        for member in tar.getmembers():
-            if member.isfile() and not member.name.startswith("."):
-                for line in tar.extractfile(member).read().decode().splitlines():
-                    yield (line)
-
-
-def read_gzip_textfile(file_path):
-    file_string = file_path.as_posix()
-    if file_string.endswith(".tar.gz") or file_string.endswith(".tgz"):
-        f = _extract_tarfile(file_path)
-    else:
-        import gzip
-
-        f = gzip.open(file_path, "rt")
-
-    for i, line in enumerate(f, 1):
-        if "\x00" in line:
-            raise ValueError(f"Null bytes at line {i} of {file_path}")
-        yield line
-
-
-def get_node(tree, taxid):
-    try:
-        node = tree.find(int(taxid))
-    except skbio.tree._exception.MissingNodeError as e:
-        logger.debug(f"Node {taxid} not found, trying a string search")
-        node = tree.find(str(taxid))
-        logger.debug(f"    ... found {node}")
-
-    if isinstance(node, skbio.tree._tree.TreeNode):
-        return node
-    else:
-        logger.warning(f"Node for taxid {taxid} not found in tree.")
-
-
-def generate_augustus_tree(
-    tree, taxids_to_augustus_dataset_mapping, cache_dir, update_tree=False
-):
-
-    cache_file = Path(cache_dir, "augustus_tree.db")
-    taxids_to_augustus_dataset_mapping_checksum = compute_sha256(
-        taxids_to_augustus_dataset_mapping
-    )
-
-    logger.info(
-        f"Reading Augustus dataset mapping from {taxids_to_augustus_dataset_mapping}"
-    )
-    augustus_mapping = read_augustus_mapping(taxids_to_augustus_dataset_mapping)
-    logger.info(
-        f"    ... found {len(augustus_mapping.keys())} datasets in Augustus mapping file"
-    )
-
-    with shelve.open(cache_file) as cache:
-        if (
-            "augustus_tree" in cache
-            and "augustus_tip_names" in cache
-            and "taxids_to_augustus_dataset_mapping_checksum" in cache
-            and cache["taxids_to_augustus_dataset_mapping_checksum"]
-            == taxids_to_augustus_dataset_mapping_checksum
-            and not update_tree
-        ):
-            logger.info(f"Reading Augustus tree from {cache_file}")
-            return augustus_mapping, cache["augustus_tree"], cache["augustus_tip_names"]
-
-        else:
-            logger.info(f"Pruning tree for Augustus datasets")
-            augustus_tree = tree.copy(deep=True)
-            initial_node_count = int(augustus_tree.count())
-
-            # Shear works on tips but not all Augustus nodes are tips. We
-            # need to remove all descendants of the Augustus nodes first.
-            augustus_nodes = [
-                get_node(augustus_tree, x) for x in augustus_mapping.keys()
-            ]
-            augustus_node_names = [x.name for x in augustus_nodes]
-            logger.debug(
-                f"Found {len(augustus_node_names)} Augustus taxids in tree:\n{augustus_node_names}"
-            )
-
-            for node in augustus_nodes:
-                if node.has_children():
-                    node_children = node.children
-                    logger.debug(
-                        f"Node {node.name} has children {[x.name for x in node_children]}"
-                    )
-                    logger.debug(f"\n{node.ascii_art()}")
-                    # I don't know why, but this sometimes leaves one child.
-                    for child in node_children:
-                        logger.debug(f"Removing node {child.name}")
-                        removed = node.remove(child)
-                        logger.debug(f"Removed? {removed}")
-
-                    # Running pop removes the remaining child.
-                    if not node.is_tip():
-                        node.pop()
-
-                logger.debug(f"Is node {node.name} a tip? {node.is_tip()}")
-                logger.debug(f"\n{node.ascii_art()}")
-
-            # Now we can shear the tree
-            sheared_augustus_tree = augustus_tree.shear(
-                names=augustus_node_names,
-                prune=False,
-                inplace=False,
-                strict=False,
-            )
-
-            final_node_count = int(sheared_augustus_tree.count())
-            nodes_removed = initial_node_count - final_node_count
-
-            logger.debug(f"    ... NCBI tree had {initial_node_count} nodes.")
-            logger.debug(f"    ... Removed {nodes_removed} nodes.")
-            logger.debug(f"    ... Augustus tree has {final_node_count} nodes.")
-
-            logger.debug("Getting tip names of the Augustus tree")
-            augustus_tip_names = [x.name for x in sheared_augustus_tree.tips()]
-            logger.debug(f"    ... {augustus_tip_names}")
-
-            logger.info("Caching the pruned Augustus tree")
-
-            cache["augustus_tree"] = sheared_augustus_tree
-            cache["augustus_tip_names"] = augustus_tip_names
-            cache["taxids_to_augustus_dataset_mapping_checksum"] = (
-                taxids_to_augustus_dataset_mapping_checksum
-            )
-
-            return augustus_mapping, sheared_augustus_tree, augustus_tip_names
+from atol_reference_data_lookups.io import read_busco_mapping
+from atol_reference_data_lookups.tree import (
+    generate_augustus_tree,
+    generate_taxonomy_tree,
+    get_node,
+    read_taxdump_file,
+)
 
 
 class TaxdumpTree:
@@ -253,9 +21,7 @@ class TaxdumpTree:
         taxids_to_busco_dataset_mapping,
         taxids_to_augustus_dataset_mapping,
         cache_dir,
-        resolve_to_rank="species",
     ):
-
         logger.info(f"Reading NCBI taxonomy from {nodes_file}")
         self.nodes, nodes_changed = read_taxdump_file(
             nodes_file, cache_dir, "nodes_slim"
@@ -264,37 +30,10 @@ class TaxdumpTree:
         logger.info(f"Reading NCBI taxon names from {names_file}")
         names, names_changed = read_taxdump_file(names_file, cache_dir, "names")
 
-        # Generate taxonomoic info dictionaries for faster lookups
-        scientific_names = names[names["name_class"] == "scientific name"]
-        self.scientific_name_dict = scientific_names["name_txt"].to_dict()
-
-        # prefer genbank common name, fallback to common name
-        genbank_common_names = names[names["name_class"] == "genbank common name"]
-        genbank_common_name_dict = genbank_common_names["name_txt"].to_dict()
-        common_names = names[names["name_class"] == "common name"]
-        common_name_dict = common_names["name_txt"].to_dict()
-        self.common_name_dict = {**common_name_dict, **genbank_common_name_dict}
-
-        self.authority_dict = names[names["name_class"] == "authority"][
-            "name_txt"
-        ].to_dict()
-
-        self.name_to_taxids = {}
-        for taxid, name in self.scientific_name_dict.items():
-            key = name.lower()
-            self.name_to_taxids.setdefault(key, []).append(taxid)
-
         update_tree = any([nodes_changed, names_changed])
 
         self.tree = generate_taxonomy_tree(
             names, self.nodes, cache_dir, update_tree=update_tree
-        )
-
-        logger.info(f"Traversing the tree for rank information")
-        self.resolve_to_rank = resolve_to_rank
-        self.accepted_ranks = find_lower_ranks(self.tree, self.resolve_to_rank)
-        logger.debug(
-            f"Accepted ranks including and below {self.resolve_to_rank}:\n{self.accepted_ranks}"
         )
 
         logger.info(
@@ -302,7 +41,7 @@ class TaxdumpTree:
         )
         self.busco_mapping = read_busco_mapping(taxids_to_busco_dataset_mapping)
         logger.info(
-            f"    ... found {len(self.busco_mapping.keys())} datasets in BUSCO mapping file"
+            f"    ... found {len(self.busco_mapping)} datasets in BUSCO mapping file"
         )
 
         self.augustus_mapping, self.augustus_tree, self.augustus_tip_names = (
@@ -311,135 +50,72 @@ class TaxdumpTree:
             )
         )
 
-    def get_authority_txt(self, taxid):
-        return self.authority_dict.get(taxid, None)
-
-    def get_common_name_txt(self, taxid):
-        return self.common_name_dict.get(taxid, None)
-
-    def get_rank(self, taxid):
-        return self.nodes.at[taxid, "rank"]
-
-    def get_scientific_name_txt(self, taxid):
-        return self.scientific_name_dict.get(taxid, None)
-
-    def search_by_binomial_name(self, genus, species, package_id):
-        search_string = f"{genus} {species}"
-        logger.debug(f"Searching for {search_string}")
-
-        candidate_taxids = self.name_to_taxids.get(search_string.lower(), [])
-        if len(candidate_taxids) == 0:
-            logger.debug(f"No results found for {search_string}")
-            return None
-        accepted_level_taxids = [
-            taxid
-            for taxid in candidate_taxids
-            if self.get_rank(taxid) in self.accepted_ranks
-        ]
-
-        if len(accepted_level_taxids) == 1:
-            return accepted_level_taxids[0]
-        else:
-            logger.debug(f"Didn't find a single taxid for {search_string}")
-            logger.debug(accepted_level_taxids)
-
-        return None
-
     def get_ancestor_taxids(self, taxid):
         logger.debug(f"Looking up ancestors for taxid {taxid}")
-
         node = get_node(self.tree, taxid)
-
         ancestor_taxids = [x.name for x in node.ancestors()]
         logger.debug(f"ancestor_taxids: {ancestor_taxids}")
         return ancestor_taxids
-
-    def get_taxonomy_string(self, ancestor_taxids):
-
-        ancestor_names_all = [
-            self.get_scientific_name_txt(int(x)) for x in ancestor_taxids
-        ]
-        ancestor_names = [x for x in ancestor_names_all if x not in [None, "root"]]
-
-        if len(ancestor_names) == 0:
-            return None
-        else:
-            name_list = ancestor_names[::-1]
-            return "; ".join(name_list)
-
-    def get_order_and_family(self, ancestor_taxids):
-        order = None
-        family = None
-
-        for taxid in ancestor_taxids:
-            taxid_int = int(taxid)
-            rank = self.get_rank(taxid_int)
-            if rank == "family":
-                family = self.get_scientific_name_txt(taxid_int)
-            if rank == "order":
-                order = self.get_scientific_name_txt(taxid_int)
-            # if we've found the order, we can stop
-            if order is not None:
-                return order, family
-
-        return order, family
 
     def get_busco_lineage(self, taxid, ancestor_taxids):
         """
         Find the closest ancestor that is in the BUSCO taxid map and return the
         lineage name.
         """
-
         logger.debug(f"Looking up BUSCO dataset name for taxid {taxid}")
         logger.debug(f"Checking ancestor_taxids {ancestor_taxids}")
 
-        for taxid in ancestor_taxids:
-            if int(taxid) in self.busco_mapping.keys():
-                return self.busco_mapping[int(taxid)]
-            if taxid in self.busco_mapping.keys():
-                return self.busco_mapping[taxid]
+        for ancestor_taxid in ancestor_taxids:
+            if int(ancestor_taxid) in self.busco_mapping:
+                return self.busco_mapping[int(ancestor_taxid)]
+            if ancestor_taxid in self.busco_mapping:
+                return self.busco_mapping[ancestor_taxid]
+
+        return None
 
     def get_augustus_lineage(self, taxid, ancestor_taxids):
-
         logger.debug(f"Looking up Augustus dataset name for taxid {taxid}")
 
-        node = get_node(self.tree, taxid)
-
         # Include taxid in the search, in case it has been trained
-        ancestor_taxids.insert(0, taxid)
+        search_taxids = [taxid] + list(ancestor_taxids)
 
-        # Find the first ancestor that is present in the Augustus sub-tree
         closest_taxid_in_augustus_tree = None
-        while not closest_taxid_in_augustus_tree and len(ancestor_taxids) > 0:
-            taxid = ancestor_taxids.pop(0)
-            logger.debug(f"Checking Augustus tree for {taxid}")
+        while not closest_taxid_in_augustus_tree and len(search_taxids) > 0:
+            current = search_taxids.pop(0)
+            logger.debug(f"Checking Augustus tree for {current}")
             try:
-                closest_taxid_in_augustus_tree = get_node(self.augustus_tree, taxid)
+                closest_taxid_in_augustus_tree = get_node(
+                    self.augustus_tree, current
+                )
             except skbio.tree._exception.MissingNodeError:
-                logger.debug(f"Node {taxid} not in Augustus tree")
+                logger.debug(f"Node {current} not in Augustus tree")
+
+        if not closest_taxid_in_augustus_tree:
+            return None
 
         logger.debug(
             f"Found closest_taxid_in_augustus_tree {closest_taxid_in_augustus_tree.name}"
         )
 
-        if closest_taxid_in_augustus_tree:
-            dist_to_dataset = {}
-            for taxid in self.augustus_mapping.keys():
-                logger.debug(f"Calculating distance to {taxid}")
-                try:
-                    dest_node = get_node(self.augustus_tree, taxid)
-                    dist_to_dataset[taxid] = closest_taxid_in_augustus_tree.distance(
+        dist_to_dataset = {}
+        for augustus_taxid in self.augustus_mapping:
+            logger.debug(f"Calculating distance to {augustus_taxid}")
+            try:
+                dest_node = get_node(self.augustus_tree, augustus_taxid)
+                dist_to_dataset[augustus_taxid] = (
+                    closest_taxid_in_augustus_tree.distance(
                         dest_node, use_length=False
                     )
-                    logger.debug(f"    ...{dist_to_dataset[taxid]}")
-                except skbio.tree._exception.MissingNodeError:
-                    logger.debug(f"{taxid} not in Augustus tree")
+                )
+                logger.debug(f"    ...{dist_to_dataset[augustus_taxid]}")
+            except skbio.tree._exception.MissingNodeError:
+                logger.debug(f"{augustus_taxid} not in Augustus tree")
 
-            logger.debug(f"Distances: {dist_to_dataset}")
-            closest_dataset = min(dist_to_dataset, key=dist_to_dataset.get)
+        logger.debug(f"Distances: {dist_to_dataset}")
+        closest_dataset = min(dist_to_dataset, key=dist_to_dataset.get)
 
-            logger.debug(
-                f"Closest dataset is {closest_dataset} with dist {dist_to_dataset[closest_dataset]}"
-            )
+        logger.debug(
+            f"Closest dataset is {closest_dataset} with dist {dist_to_dataset[closest_dataset]}"
+        )
 
-            return self.augustus_mapping[closest_dataset]
+        return self.augustus_mapping[closest_dataset]
