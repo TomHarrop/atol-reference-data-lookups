@@ -31,6 +31,7 @@ atol-reference-data-lookups = "atol_reference_data_lookups.atol_reference_data_l
 get-remote-files = "get_remote_files.get_remote_files:main"
 
 [tool.setuptools.package-data]
+"atol_reference_data_lookups" = ["config/taxid_to_augustus_dataset.tsv"]
 "get_remote_files" = ["workflow/Snakefile", "workflow/rules/*.smk"]
 
 [tool.setuptools_scm]
