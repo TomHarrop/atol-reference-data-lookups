@@ -32,9 +32,7 @@ def read_taxdump_file(file_path, cache_dir, scheme):
             logger.info(f"Reading {scheme} from cache {cache_file}")
             return (cache["data"], False)
         else:
-            data = skbio.io.read(
-                file_path, "taxdump", into=pd.DataFrame, scheme=scheme
-            )
+            data = skbio.io.read(file_path, "taxdump", into=pd.DataFrame, scheme=scheme)
             logger.info(f"Writing {scheme} to cache {cache_file}")
             cache["data"] = data
             cache["checksum"] = current_checksum
@@ -83,17 +81,16 @@ def generate_taxonomy_tree(names, nodes, cache_dir, update_tree=False):
 
 
 def get_node(tree, taxid):
-    try:
-        node = tree.find(int(taxid))
-    except skbio.tree._exception.MissingNodeError:
-        logger.debug(f"Node {taxid} not found, trying a string search")
-        node = tree.find(str(taxid))
-        logger.debug(f"    ... found {node}")
+    for search_id in (int(taxid), str(taxid)):
+        try:
+            node = tree.find(search_id)
+            if isinstance(node, skbio.tree._tree.TreeNode):
+                return node
+        except (skbio.tree._exception.MissingNodeError, ValueError):
+            continue
 
-    if isinstance(node, skbio.tree._tree.TreeNode):
-        return node
-    else:
-        logger.warning(f"Node for taxid {taxid} not found in tree.")
+    logger.debug(f"Node for taxid {taxid} not found in tree.")
+    return None
 
 
 def find_lower_ranks(tree, top_rank="species", excluded_ranks=None):
@@ -155,6 +152,19 @@ def generate_augustus_tree(
             augustus_nodes = [
                 get_node(augustus_tree, x) for x in augustus_mapping.keys()
             ]
+
+            missing_taxids = [
+                taxid
+                for taxid, node in zip(augustus_mapping.keys(), augustus_nodes)
+                if node is None
+            ]
+            if missing_taxids:
+                logger.warning(
+                    f"Skipping {len(missing_taxids)} taxids not found in tree: "
+                    f"{missing_taxids}"
+                )
+
+            augustus_nodes = [node for node in augustus_nodes if node is not None]
             augustus_node_names = [x.name for x in augustus_nodes]
             logger.debug(
                 f"Found {len(augustus_node_names)} Augustus taxids in tree:\n{augustus_node_names}"

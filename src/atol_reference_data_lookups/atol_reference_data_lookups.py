@@ -108,8 +108,16 @@ def main() -> None:
     logger.info(f"Looking up {len(query_taxids)} query_taxids")
 
     taxonomy_reference_data = {}
+
+    missing_nodes = []
+
     for query_taxid in query_taxids:
+        if taxdump_tree.get_node(query_taxid) is None:
+            missing_nodes.append(query_taxid)
+            continue
+
         ancestor_taxids = taxdump_tree.get_ancestor_taxids(query_taxid)
+
         genetic_code_id, mitochondrial_genetic_code_id = taxdump_tree.get_genetic_codes(
             query_taxid
         )
@@ -126,5 +134,9 @@ def main() -> None:
         }
 
     logger.info("Finished lookups")
+
+    n_missing_nodes = len(missing_nodes)
+    if n_missing_nodes > 0:
+        logger.warning(f"{n_missing_nodes} query taxon_ids were not found in the tree")
 
     write_json_output(taxonomy_reference_data)

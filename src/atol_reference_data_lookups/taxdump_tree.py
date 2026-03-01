@@ -56,9 +56,16 @@ class TaxdumpTree:
             )
         )
 
+    def get_node(self, taxid):
+        """Look up a node in the taxonomy tree by taxid."""
+        return get_node(self.tree, taxid)
+
     def get_ancestor_taxids(self, taxid):
         logger.debug(f"Looking up ancestors for taxid {taxid}")
-        node = get_node(self.tree, taxid)
+        node = self.get_node(taxid)
+        if node is None:
+            logger.warning(f"Cannot find ancestors for taxid {taxid}: not in tree")
+            return []
         ancestor_taxids = [x.name for x in node.ancestors()]
         logger.debug(f"ancestor_taxids: {ancestor_taxids}")
         return ancestor_taxids
@@ -89,12 +96,9 @@ class TaxdumpTree:
         while not closest_taxid_in_augustus_tree and len(search_taxids) > 0:
             current = search_taxids.pop(0)
             logger.debug(f"Checking Augustus tree for {current}")
-            try:
-                closest_taxid_in_augustus_tree = get_node(
-                    self.augustus_tree, current
-                )
-            except skbio.tree._exception.MissingNodeError:
-                logger.debug(f"Node {current} not in Augustus tree")
+            closest_taxid_in_augustus_tree = get_node(
+                self.augustus_tree, current
+            )
 
         if not closest_taxid_in_augustus_tree:
             return None
@@ -106,8 +110,11 @@ class TaxdumpTree:
         dist_to_dataset = {}
         for augustus_taxid in self.augustus_mapping:
             logger.debug(f"Calculating distance to {augustus_taxid}")
+            dest_node = get_node(self.augustus_tree, augustus_taxid)
+            if dest_node is None:
+                logger.debug(f"{augustus_taxid} not in Augustus tree")
+                continue
             try:
-                dest_node = get_node(self.augustus_tree, augustus_taxid)
                 dist_to_dataset[augustus_taxid] = (
                     closest_taxid_in_augustus_tree.distance(
                         dest_node, use_length=False
@@ -118,6 +125,10 @@ class TaxdumpTree:
                 logger.debug(f"{augustus_taxid} not in Augustus tree")
 
         logger.debug(f"Distances: {dist_to_dataset}")
+
+        if not dist_to_dataset:
+            return None
+
         closest_dataset = min(dist_to_dataset, key=dist_to_dataset.get)
 
         logger.debug(
@@ -134,5 +145,13 @@ class TaxdumpTree:
         Returns a tuple of (genetic_code_id, mitochondrial_genetic_code_id).
         """
         logger.debug(f"Looking up genetic codes for taxid {taxid}")
-        row = self.nodes_full.loc[taxid]
+        node = self.get_node(taxid)
+        if node is None:
+            logger.warning(f"Cannot find genetic codes for taxid {taxid}: not in tree")
+            return (None, None)
+        try:
+            row = self.nodes_full.loc[int(taxid)]
+        except KeyError:
+            logger.warning(f"Taxid {taxid} not found in nodes_full DataFrame")
+            return (None, None)
         return (row["genetic_code_id"], row["mitochondrial_genetic_code_id"])
