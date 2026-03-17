@@ -27,7 +27,7 @@ rule map_metadata:
         names=ancient("resources/new_taxdump/names.dmp"),
         taxids_to_busco_dataset_mapping=ancient(
             "resources/"
-            "mapping_taxids-busco_dataset_name.eukaryota_odb10.2019-12-16.txt.tar.gz"
+            "mapping_taxids-busco_dataset_name.eukaryota_odb12.2025-01-15.txt.tar.gz"
         ),
     shell:
         "{params.call} "
