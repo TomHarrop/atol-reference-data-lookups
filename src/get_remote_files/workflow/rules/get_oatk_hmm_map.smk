@@ -5,7 +5,7 @@ hmm_map_url = (
 
 rule get_oatk_hmm_map:
     output:
-        taxid_file=("resources/" "oatk.TAXID.tsv"),
+        taxid_file="resources/oatk.TAXID.tsv",
         timestamp="resources/oatk.TAXID.TIMESTAMP",
     log:
         "resources/get_oatk_hmm_map.log",
