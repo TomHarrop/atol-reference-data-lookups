@@ -37,7 +37,8 @@ class TaxdumpTree:
         self,
         nodes_file,
         names_file,
-        taxids_to_busco_dataset_mapping,
+        taxids_to_busco_odb12_dataset_mapping,
+        taxids_to_busco_odb10_dataset_mapping,
         taxids_to_augustus_dataset_mapping,
         oatk_taxid_file,
         cache_dir,
@@ -66,11 +67,23 @@ class TaxdumpTree:
         )
 
         logger.info(
-            f"Reading BUSCO dataset mapping from {taxids_to_busco_dataset_mapping}"
+            f"Reading BUSCO dataset mapping from {taxids_to_busco_odb12_dataset_mapping}"
         )
-        self.busco_mapping = read_busco_mapping(taxids_to_busco_dataset_mapping)
+        self.busco_odb12_mapping = read_busco_mapping(
+            taxids_to_busco_odb12_dataset_mapping
+        )
         logger.info(
-            f"    ... found {len(self.busco_mapping)} datasets in BUSCO mapping file"
+            f"    ... found {len(self.busco_odb12_mapping)} odb12 datasets in BUSCO mapping file"
+        )
+
+        logger.info(
+            f"Reading BUSCO dataset mapping from {taxids_to_busco_odb10_dataset_mapping}"
+        )
+        self.busco_odb10_mapping = read_busco_mapping(
+            taxids_to_busco_odb10_dataset_mapping
+        )
+        logger.info(
+            f"    ... found {len(self.busco_odb10_mapping)} odb10 datasets in BUSCO mapping file"
         )
 
         logger.info(f"Reading oatk mapping from {oatk_taxid_file}")

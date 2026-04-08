@@ -9,6 +9,7 @@ include: "rules/get_oatk_hmm_map.smk"
 rule target:
     default_target: True
     input:
-        rules.download_busco_placement_file.output,
+        rules.download_busco_odb10_placement_file.output,
+        rules.download_busco_odb12_placement_file.output,
         rules.expand_taxdump.output,
         rules.get_oatk_hmm_map.output,

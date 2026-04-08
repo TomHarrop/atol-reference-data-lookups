@@ -40,11 +40,23 @@ def parse_args() -> Namespace:
     )
 
     ref_group.add_argument(
-        "--taxids_to_busco_dataset_mapping",
+        "--taxids_to_busco_odb12_dataset_mapping",
         required=True,
         help=(
             """
-              BUSCO placement file from
+              BUSCO odb12 placement file from
+              https://busco-data.ezlab.org/v5/data/placement_files/
+            """
+        ),
+        type=Path,
+    )
+
+    ref_group.add_argument(
+        "--taxids_to_busco_odb10_dataset_mapping",
+        required=True,
+        help=(
+            """
+              BUSCO odb10 placement file from
               https://busco-data.ezlab.org/v5/data/placement_files/
             """
         ),
@@ -112,7 +124,8 @@ def main() -> None:
     taxdump_tree = TaxdumpTree(
         args.nodes,
         args.names,
-        args.taxids_to_busco_dataset_mapping,
+        args.taxids_to_busco_odb12_dataset_mapping,
+        args.taxids_to_busco_odb10_dataset_mapping,
         args.taxids_to_augustus_dataset_mapping,
         args.oatk_taxid_file,
         args.cache_dir,
@@ -138,8 +151,11 @@ def main() -> None:
         find_plastid = taxdump_tree.find_plastid(query_taxid)
 
         taxonomy_reference_data[query_taxid] = {
-            "busco_dataset_name": get_ancestor_lineage(
-                taxdump_tree.busco_mapping, query_taxid, ancestor_taxids
+            "busco_odb12_dataset_name": get_ancestor_lineage(
+                taxdump_tree.busco_odb12_mapping, query_taxid, ancestor_taxids
+            ),
+            "busco_odb10_dataset_name": get_ancestor_lineage(
+                taxdump_tree.busco_odb10_mapping, query_taxid, ancestor_taxids
             ),
             "oatk_hmm_name": get_ancestor_lineage(
                 taxdump_tree.oatk_mapping, query_taxid, ancestor_taxids

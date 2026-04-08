@@ -16,7 +16,8 @@ test_taxid:
 		--taxid 172942 \
 		--nodes resources/new_taxdump/nodes.dmp \
 		--names resources/new_taxdump/names.dmp \
-		--taxids_to_busco_dataset_mapping resources/mapping_taxids-busco_dataset_name.eukaryota_odb12.2025-01-15.txt.tar.gz \
+		--taxids_to_busco_odb12_dataset_mapping resources/mapping_taxids-busco_dataset_name.eukaryota_odb12.2025-01-15.txt.tar.gz \
+		--taxids_to_busco_odb10_dataset_mapping resources/mapping_taxids-busco_dataset_name.eukaryota_odb10.2019-12-16.txt.tar.gz \
 		--oatk_taxid_file resources/oatk.TAXID.tsv \
 		> test-output/test_taxid.json
 
@@ -25,7 +26,8 @@ test_tax_list:
 		--taxid-list test-data/taxid_list.txt \
 		--nodes resources/new_taxdump/nodes.dmp \
 		--names resources/new_taxdump/names.dmp \
-		--taxids_to_busco_dataset_mapping resources/mapping_taxids-busco_dataset_name.eukaryota_odb12.2025-01-15.txt.tar.gz \
+		--taxids_to_busco_odb12_dataset_mapping resources/mapping_taxids-busco_dataset_name.eukaryota_odb12.2025-01-15.txt.tar.gz \
+		--taxids_to_busco_odb10_dataset_mapping resources/mapping_taxids-busco_dataset_name.eukaryota_odb10.2019-12-16.txt.tar.gz \
 		--oatk_taxid_file resources/oatk.TAXID.tsv \
 		> test-output/test_tax_list.json
 
@@ -34,7 +36,8 @@ test_full_list:
 		--taxid-list test-data/full_list.txt \
 		--nodes resources/new_taxdump/nodes.dmp \
 		--names resources/new_taxdump/names.dmp \
-		--taxids_to_busco_dataset_mapping resources/mapping_taxids-busco_dataset_name.eukaryota_odb12.2025-01-15.txt.tar.gz \
+		--taxids_to_busco_odb12_dataset_mapping resources/mapping_taxids-busco_dataset_name.eukaryota_odb12.2025-01-15.txt.tar.gz \
+		--taxids_to_busco_odb10_dataset_mapping resources/mapping_taxids-busco_dataset_name.eukaryota_odb10.2019-12-16.txt.tar.gz \
 		--oatk_taxid_file resources/oatk.TAXID.tsv \
 		> test-output/test_full_list.json
 
