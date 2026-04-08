@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-taxdump_url = "ftp://ftp.ncbi.nih.gov/pub/taxonomy/new_taxdump/new_taxdump.tar.gz"
+taxdump_url = "http://ftp.ncbi.nih.gov/pub/taxonomy/new_taxdump/new_taxdump.tar.gz"
 
 taxdump_files = [
     "citations.dmp",
@@ -27,10 +27,10 @@ rule expand_taxdump:
     output:
         [Path("resources/new_taxdump", x).as_posix() for x in taxdump_files],
         timestamp="resources/new_taxdump/TIMESTAMP",
-    params:
-        outdir=subpath(output[0], parent=True),
     container:
         "docker://debian:stable-20250113"
+    params:
+        outdir=subpath(output[0], parent=True),
     shell:
         "mkdir -p {params.outdir} && "
         "tar -xzf {input.taxdump} -C {params.outdir} && "
@@ -40,19 +40,27 @@ rule expand_taxdump:
 rule download_taxdump_file:
     output:
         taxdump=temp("resources/new_taxdump.tar.gz"),
-    params:
-        url=taxdump_url,
-        name=lambda wildcards: Path(taxdump_url).name,
-    resources:
-        runtime=60,
     log:
         "resources/download_taxdump_file.log",
     shadow:
         "minimal"
     container:
         "docker://quay.io/biocontainers/gnu-wget:1.18--hb829ee6_10"
+    resources:
+        runtime=60,
+    params:
+        url=taxdump_url,
+        name=lambda wildcards: Path(taxdump_url).name,
     shell:
-        "wget {params.url} -O {params.name} &> {log} && "
+        "wget "
+        "--retry-connrefused "
+        "--waitretry=5 "
+        "--read-timeout=20 "
+        "--timeout=15 -t 5 "
+        "{params.url} "
+        "-O {params.name} "
+        "&> {log} "
+        "&& "
         "wget {params.url}.md5 -O {params.name}.md5 &>> {log} && "
         "md5sum -c {params.name}.md5 &>> {log} && "
         "mv {params.name} {output.taxdump}"
