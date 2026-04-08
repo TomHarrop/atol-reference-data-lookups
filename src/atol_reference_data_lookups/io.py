@@ -45,3 +45,13 @@ def read_augustus_mapping(taxids_to_augustus_dataset_mapping):
             taxid_to_dataset[int(splits[0])] = str(splits[1])
     logger.debug(taxid_to_dataset)
     return taxid_to_dataset
+
+
+def read_oatk_mapping(oatk_taxid_file):
+    taxid_to_hmm = {}
+    with open(oatk_taxid_file, "rt") as f:
+        for line in f:
+            splits = line.strip().split(maxsplit=2)
+            taxid_to_hmm[int(splits[1])] = str(splits[0])
+    logger.debug(taxid_to_hmm)
+    return taxid_to_hmm

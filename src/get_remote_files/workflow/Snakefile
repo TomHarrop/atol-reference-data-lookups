@@ -3,6 +3,7 @@
 
 include: "rules/pull_busco_mapping.smk"
 include: "rules/pull_ncbi_taxonomy.smk"
+include: "rules/get_oatk_hmm_map.smk"
 
 
 rule target:
@@ -10,3 +11,4 @@ rule target:
     input:
         rules.download_busco_placement_file.output,
         rules.expand_taxdump.output,
+        rules.get_oatk_hmm_map.output,

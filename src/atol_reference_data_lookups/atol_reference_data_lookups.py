@@ -1,4 +1,4 @@
-from .taxdump_tree import TaxdumpTree
+from .taxdump_tree import TaxdumpTree, get_ancestor_lineage
 from atol_reference_data_lookups import logger
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
@@ -63,6 +63,18 @@ def parse_args() -> Namespace:
         type=Path,
     )
 
+    ref_group.add_argument(
+        "--oatk_taxid_file",
+        required=True,
+        help=(
+            """
+              TaxId to model name map from
+              https://github.com/c-zhou/OatkDB
+            """
+        ),
+        type=Path,
+    )
+
     options_group.add_argument(
         "--cache_dir",
         help=(
@@ -102,6 +114,7 @@ def main() -> None:
         args.names,
         args.taxids_to_busco_dataset_mapping,
         args.taxids_to_augustus_dataset_mapping,
+        args.oatk_taxid_file,
         args.cache_dir,
     )
 
@@ -122,15 +135,21 @@ def main() -> None:
             query_taxid
         )
 
+        find_plastid = taxdump_tree.find_plastid(query_taxid)
+
         taxonomy_reference_data[query_taxid] = {
-            "busco_dataset_name": taxdump_tree.get_busco_lineage(
-                query_taxid, ancestor_taxids
+            "busco_dataset_name": get_ancestor_lineage(
+                taxdump_tree.busco_mapping, query_taxid, ancestor_taxids
+            ),
+            "oatk_hmm_name": get_ancestor_lineage(
+                taxdump_tree.oatk_mapping, query_taxid, ancestor_taxids
             ),
             "augustus_dataset_name": taxdump_tree.get_augustus_lineage(
                 query_taxid, ancestor_taxids
             ),
             "genetic_code_id": int(genetic_code_id),
             "mitochondrial_genetic_code_id": int(mitochondrial_genetic_code_id),
+            "find_plastid": find_plastid,
         }
 
     logger.info("Finished lookups")

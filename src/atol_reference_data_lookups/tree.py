@@ -39,6 +39,38 @@ def read_taxdump_file(file_path, cache_dir, scheme):
             return (data, True)
 
 
+def read_plastid_codes(file_path, cache_dir):
+    cache_file = Path(cache_dir, "plastid_codes.db")
+    plastid_codes_checksum = compute_sha256(file_path)
+
+    with shelve.open(cache_file) as cache:
+        if (
+            "plastid_codes" in cache
+            and "plastid_codes_checksum" in cache
+            and cache["plastid_codes_checksum"] == plastid_codes_checksum
+        ):
+            logger.info(f"Reading plastid_codes from cache {cache_file}")
+            return (cache["plastid_codes"], False)
+        else:
+            data = pd.read_csv(
+                file_path,
+                sep="\t\\|(?:\t|$)",
+                engine="python",
+                names=["tax_id", "plastid_genetic_code_id"],
+                index_col=0,
+                usecols=[0, 13],
+            )
+
+            plastid_codes = {}
+            for index, row in data.dropna().iterrows():
+                plastid_codes[int(index)] = int(row["plastid_genetic_code_id"])
+
+            logger.info(f"Writing plastid_codes to cache {cache_file}")
+            cache["plastid_codes"] = plastid_codes
+            cache["plastid_codes_checksum"] = plastid_codes_checksum
+            return (plastid_codes, True)
+
+
 def read_taxdump_nodes(file_path, cache_dir):
     """
     Read the full nodes.dmp file into a DataFrame indexed by tax_id,

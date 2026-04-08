@@ -17,6 +17,7 @@ test_taxid:
 		--nodes resources/new_taxdump/nodes.dmp \
 		--names resources/new_taxdump/names.dmp \
 		--taxids_to_busco_dataset_mapping resources/mapping_taxids-busco_dataset_name.eukaryota_odb12.2025-01-15.txt.tar.gz \
+		--oatk_taxid_file resources/oatk.TAXID.tsv \
 		> test-output/test_taxid.json
 
 test_tax_list:
@@ -25,8 +26,8 @@ test_tax_list:
 		--nodes resources/new_taxdump/nodes.dmp \
 		--names resources/new_taxdump/names.dmp \
 		--taxids_to_busco_dataset_mapping resources/mapping_taxids-busco_dataset_name.eukaryota_odb12.2025-01-15.txt.tar.gz \
+		--oatk_taxid_file resources/oatk.TAXID.tsv \
 		> test-output/test_tax_list.json
-
 
 test_full_list:
 	atol-reference-data-lookups \
@@ -34,8 +35,8 @@ test_full_list:
 		--nodes resources/new_taxdump/nodes.dmp \
 		--names resources/new_taxdump/names.dmp \
 		--taxids_to_busco_dataset_mapping resources/mapping_taxids-busco_dataset_name.eukaryota_odb12.2025-01-15.txt.tar.gz \
+		--oatk_taxid_file resources/oatk.TAXID.tsv \
 		> test-output/test_full_list.json
-
 
 CHANGELOG.md: .git/index
 	gitchangelog > $(tmpdir)/CHANGELOG.md

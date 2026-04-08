@@ -3,14 +3,32 @@
 import skbio.tree._exception
 
 from atol_reference_data_lookups import logger
-from atol_reference_data_lookups.io import read_busco_mapping
+from atol_reference_data_lookups.io import read_busco_mapping, read_oatk_mapping
 from atol_reference_data_lookups.tree import (
     generate_augustus_tree,
     generate_taxonomy_tree,
     get_node,
     read_taxdump_file,
     read_taxdump_nodes,
+    read_plastid_codes,
 )
+
+
+def get_ancestor_lineage(taxid_map, taxid, ancestor_taxids):
+    """
+    Find the closest ancestor that is in the taxid map and return the
+    lineage name.
+    """
+    logger.debug(f"Looking up dataset name for taxid {taxid}")
+    logger.debug(f"Checking ancestor_taxids {ancestor_taxids}")
+
+    for ancestor_taxid in ancestor_taxids:
+        if int(ancestor_taxid) in taxid_map:
+            return taxid_map[int(ancestor_taxid)]
+        if ancestor_taxid in taxid_map:
+            return taxid_map[ancestor_taxid]
+
+    return None
 
 
 class TaxdumpTree:
@@ -21,15 +39,20 @@ class TaxdumpTree:
         names_file,
         taxids_to_busco_dataset_mapping,
         taxids_to_augustus_dataset_mapping,
+        oatk_taxid_file,
         cache_dir,
     ):
+
         logger.info(f"Reading NCBI taxonomy from {nodes_file}")
         self.nodes, nodes_changed = read_taxdump_file(
             nodes_file, cache_dir, "nodes_slim"
         )
 
         logger.info(f"Reading full NCBI nodes from {nodes_file}")
-        self.nodes_full, nodes_full_changed = read_taxdump_nodes(
+        self.nodes_full, nodes_full_changed = read_taxdump_nodes(nodes_file, cache_dir)
+
+        logger.info(f"Reading plastid codes from {nodes_file}")
+        self.plastid_codes, plastid_codes_changed = read_plastid_codes(
             nodes_file, cache_dir
         )
 
@@ -49,6 +72,9 @@ class TaxdumpTree:
         logger.info(
             f"    ... found {len(self.busco_mapping)} datasets in BUSCO mapping file"
         )
+
+        logger.info(f"Reading oatk mapping from {oatk_taxid_file}")
+        self.oatk_mapping = read_oatk_mapping(oatk_taxid_file)
 
         self.augustus_mapping, self.augustus_tree, self.augustus_tip_names = (
             generate_augustus_tree(
@@ -70,22 +96,6 @@ class TaxdumpTree:
         logger.debug(f"ancestor_taxids: {ancestor_taxids}")
         return ancestor_taxids
 
-    def get_busco_lineage(self, taxid, ancestor_taxids):
-        """
-        Find the closest ancestor that is in the BUSCO taxid map and return the
-        lineage name.
-        """
-        logger.debug(f"Looking up BUSCO dataset name for taxid {taxid}")
-        logger.debug(f"Checking ancestor_taxids {ancestor_taxids}")
-
-        for ancestor_taxid in ancestor_taxids:
-            if int(ancestor_taxid) in self.busco_mapping:
-                return self.busco_mapping[int(ancestor_taxid)]
-            if ancestor_taxid in self.busco_mapping:
-                return self.busco_mapping[ancestor_taxid]
-
-        return None
-
     def get_augustus_lineage(self, taxid, ancestor_taxids):
         logger.debug(f"Looking up Augustus dataset name for taxid {taxid}")
 
@@ -96,9 +106,7 @@ class TaxdumpTree:
         while not closest_taxid_in_augustus_tree and len(search_taxids) > 0:
             current = search_taxids.pop(0)
             logger.debug(f"Checking Augustus tree for {current}")
-            closest_taxid_in_augustus_tree = get_node(
-                self.augustus_tree, current
-            )
+            closest_taxid_in_augustus_tree = get_node(self.augustus_tree, current)
 
         if not closest_taxid_in_augustus_tree:
             return None
@@ -116,9 +124,7 @@ class TaxdumpTree:
                 continue
             try:
                 dist_to_dataset[augustus_taxid] = (
-                    closest_taxid_in_augustus_tree.distance(
-                        dest_node, use_length=False
-                    )
+                    closest_taxid_in_augustus_tree.distance(dest_node, use_length=False)
                 )
                 logger.debug(f"    ...{dist_to_dataset[augustus_taxid]}")
             except skbio.tree._exception.MissingNodeError:
@@ -154,4 +160,10 @@ class TaxdumpTree:
         except KeyError:
             logger.warning(f"Taxid {taxid} not found in nodes_full DataFrame")
             return (None, None)
-        return (row["genetic_code_id"], row["mitochondrial_genetic_code_id"])
+        return (
+            row["genetic_code_id"],
+            row["mitochondrial_genetic_code_id"],
+        )
+
+    def find_plastid(self, taxid):
+        return taxid in self.plastid_codes
