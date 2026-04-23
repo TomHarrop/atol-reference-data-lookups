@@ -104,7 +104,3 @@ options:
   --parallel_downloads PARALLEL_DOWNLOADS
                         Number of parallel downloads
 ```
-
-### TODO:
-
-- [ ] Lookup OATK database
