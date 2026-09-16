@@ -83,6 +83,10 @@ def main():
     yaml_files = Path(tool_repo, "model_cfg").glob("*.yaml")
     model_dicts = [get_model_dict(x) for x in yaml_files]
 
+    print(
+        f"# Tiberius tag {tiberius_release} non-softmasking models from {_TIBERIUS_REPO}",
+        file=sys.stdout,
+    )
     for model_dict in model_dicts:
         model_cfg = model_dict.get("model_cfg")
         if model_dict.get("softmasking") == False:
