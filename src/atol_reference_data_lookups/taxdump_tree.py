@@ -41,6 +41,7 @@ class TaxdumpTree:
         taxids_to_busco_odb10_dataset_mapping,
         taxids_to_augustus_dataset_mapping,
         oatk_taxid_file,
+        tiberius_map_file,
         cache_dir,
     ):
 
@@ -85,6 +86,10 @@ class TaxdumpTree:
         logger.info(
             f"    ... found {len(self.busco_odb10_mapping)} odb10 datasets in BUSCO mapping file"
         )
+
+        logger.info(f"Reading Tiberius model mapping from {tiberius_map_file}")
+        self.tiberius_mapping = read_busco_mapping(tiberius_map_file)
+        logger.info(f"    ... found {len(self.tiberius_mapping)} tiberius models")
 
         logger.info(f"Reading oatk mapping from {oatk_taxid_file}")
         self.oatk_mapping = read_oatk_mapping(oatk_taxid_file)

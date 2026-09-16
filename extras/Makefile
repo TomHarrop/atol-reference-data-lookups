@@ -19,6 +19,7 @@ test_taxid:
 		--taxids_to_busco_odb12_dataset_mapping resources/mapping_taxids-busco_dataset_name.eukaryota_odb12.2025-01-15.txt.tar.gz \
 		--taxids_to_busco_odb10_dataset_mapping resources/mapping_taxids-busco_dataset_name.eukaryota_odb10.2019-12-16.txt.tar.gz \
 		--oatk_taxid_file resources/oatk.TAXID.tsv \
+		--tiberius_map_file resources/tiberius_map.tsv.gz \
 		> test-output/test_taxid.json
 
 test_tax_list:
@@ -29,6 +30,7 @@ test_tax_list:
 		--taxids_to_busco_odb12_dataset_mapping resources/mapping_taxids-busco_dataset_name.eukaryota_odb12.2025-01-15.txt.tar.gz \
 		--taxids_to_busco_odb10_dataset_mapping resources/mapping_taxids-busco_dataset_name.eukaryota_odb10.2019-12-16.txt.tar.gz \
 		--oatk_taxid_file resources/oatk.TAXID.tsv \
+		--tiberius_map_file resources/tiberius_map.tsv.gz \
 		> test-output/test_tax_list.json
 
 test_full_list:
@@ -39,6 +41,7 @@ test_full_list:
 		--taxids_to_busco_odb12_dataset_mapping resources/mapping_taxids-busco_dataset_name.eukaryota_odb12.2025-01-15.txt.tar.gz \
 		--taxids_to_busco_odb10_dataset_mapping resources/mapping_taxids-busco_dataset_name.eukaryota_odb10.2019-12-16.txt.tar.gz \
 		--oatk_taxid_file resources/oatk.TAXID.tsv \
+		--tiberius_map_file resources/tiberius_map.tsv.gz \
 		> test-output/test_full_list.json
 
 CHANGELOG.md: .git/index

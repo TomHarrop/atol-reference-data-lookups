@@ -23,11 +23,9 @@ def parse_args() -> Namespace:
     taxid_group.add_argument("--taxid", help="A single NCBI TaxId to look up", type=int)
     taxid_group.add_argument(
         "--taxid-list",
-        help=(
-            """
+        help=("""
             A file containing a list NCBI TaxIds to look up, one per line.
-            """
-        ),
+            """),
         type=Path,
     )
 
@@ -42,35 +40,29 @@ def parse_args() -> Namespace:
     ref_group.add_argument(
         "--taxids_to_busco_odb12_dataset_mapping",
         required=True,
-        help=(
-            """
+        help=("""
               BUSCO odb12 placement file from
               https://busco-data.ezlab.org/v5/data/placement_files/
-            """
-        ),
+            """),
         type=Path,
     )
 
     ref_group.add_argument(
         "--taxids_to_busco_odb10_dataset_mapping",
         required=True,
-        help=(
-            """
+        help=("""
               BUSCO odb10 placement file from
               https://busco-data.ezlab.org/v5/data/placement_files/
-            """
-        ),
+            """),
         type=Path,
     )
 
     ref_group.add_argument(
         "--taxids_to_augustus_dataset_mapping",
-        help=(
-            """
+        help=("""
             File that maps Augustus datasets to NCBI TaxIDs. See
             config/taxid_to_augustus_dataset.tsv
-            """
-        ),
+            """),
         default=Path(package_files_path, "config", "taxid_to_augustus_dataset.tsv"),
         type=Path,
     )
@@ -78,22 +70,27 @@ def parse_args() -> Namespace:
     ref_group.add_argument(
         "--oatk_taxid_file",
         required=True,
-        help=(
-            """
+        help=("""
               TaxId to model name map from
               https://github.com/c-zhou/OatkDB
-            """
-        ),
+            """),
+        type=Path,
+    )
+
+    ref_group.add_argument(
+        "--tiberius_map_file",
+        required=True,
+        help=("""
+              TaxId to model name map for Tiberius
+            """),
         type=Path,
     )
 
     options_group.add_argument(
         "--cache_dir",
-        help=(
-            """
+        help=("""
             Directory to cache the NCBI taxonomy after processing
-            """
-        ),
+            """),
         default=Path(
             os.getenv("XDG_CACHE_HOME", os.path.expanduser("~/.cache")),
             "atol_reference_data_lookups",
@@ -128,6 +125,7 @@ def main() -> None:
         args.taxids_to_busco_odb10_dataset_mapping,
         args.taxids_to_augustus_dataset_mapping,
         args.oatk_taxid_file,
+        args.tiberius_map_file,
         args.cache_dir,
     )
 
@@ -150,6 +148,12 @@ def main() -> None:
 
         find_plastid = taxdump_tree.find_plastid(query_taxid)
 
+        logger.debug(f"tiberius_mapping: {taxdump_tree.tiberius_mapping}")
+        logger.debug(f"ancestor_taxids: {ancestor_taxids}")
+        tiberius_model_cfg = get_ancestor_lineage(
+            taxdump_tree.tiberius_mapping, query_taxid, ancestor_taxids
+        )
+
         taxonomy_reference_data[query_taxid] = {
             "busco_odb12_dataset_name": get_ancestor_lineage(
                 taxdump_tree.busco_odb12_mapping, query_taxid, ancestor_taxids
@@ -166,6 +170,7 @@ def main() -> None:
             "genetic_code_id": int(genetic_code_id),
             "mitochondrial_genetic_code_id": int(mitochondrial_genetic_code_id),
             "find_plastid": find_plastid,
+            "tiberius_model_cfg": tiberius_model_cfg,
         }
 
     logger.info("Finished lookups")
