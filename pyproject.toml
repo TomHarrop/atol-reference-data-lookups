@@ -32,6 +32,7 @@ dependencies = ["snakemake>=9.16.3,<10", "scikit-bio>=0.6.3"]
 [project.scripts]
 atol-reference-data-lookups = "atol_reference_data_lookups.atol_reference_data_lookups:main"
 get-remote-files = "get_remote_files.get_remote_files:main"
+get-tiberius-map = "get_remote_files.get_tiberius_map:main"
 
 [tool.setuptools.package-data]
 "atol_reference_data_lookups" = ["config/taxid_to_augustus_dataset.tsv"]
