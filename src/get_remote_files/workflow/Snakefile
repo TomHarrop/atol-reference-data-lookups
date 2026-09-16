@@ -4,6 +4,7 @@
 include: "rules/pull_busco_mapping.smk"
 include: "rules/pull_ncbi_taxonomy.smk"
 include: "rules/get_oatk_hmm_map.smk"
+include: "rules/get_tiberius_map.smk"
 
 
 rule target:
@@ -13,3 +14,4 @@ rule target:
         rules.download_busco_odb12_placement_file.output,
         rules.expand_taxdump.output,
         rules.get_oatk_hmm_map.output,
+        rules.get_tiberius_map.output,
