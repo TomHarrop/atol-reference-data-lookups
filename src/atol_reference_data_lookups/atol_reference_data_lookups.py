@@ -20,8 +20,10 @@ def parse_args() -> Namespace:
 
     taxid_group = input_group.add_mutually_exclusive_group()
 
-    taxid_group.add_argument("--taxid", help="A single NCBI TaxId to look up", type=int)
-    taxid_group.add_argument(
+    _ = taxid_group.add_argument(
+        "--taxid", help="A single NCBI TaxId to look up", type=int
+    )
+    _ = taxid_group.add_argument(
         "--taxid-list",
         help=("""
             A file containing a list NCBI TaxIds to look up, one per line.
@@ -29,15 +31,15 @@ def parse_args() -> Namespace:
         type=Path,
     )
 
-    ref_group.add_argument(
+    _ = ref_group.add_argument(
         "--nodes", required=True, help="NCBI nodes.dmp file from taxdump", type=Path
     )
 
-    ref_group.add_argument(
+    _ = ref_group.add_argument(
         "--names", required=True, help="NCBI names.dmp file from taxdump", type=Path
     )
 
-    ref_group.add_argument(
+    _ = ref_group.add_argument(
         "--taxids_to_busco_odb12_dataset_mapping",
         required=True,
         help=("""
@@ -47,7 +49,7 @@ def parse_args() -> Namespace:
         type=Path,
     )
 
-    ref_group.add_argument(
+    _ = ref_group.add_argument(
         "--taxids_to_busco_odb10_dataset_mapping",
         required=True,
         help=("""
@@ -57,7 +59,7 @@ def parse_args() -> Namespace:
         type=Path,
     )
 
-    ref_group.add_argument(
+    _ = ref_group.add_argument(
         "--taxids_to_augustus_dataset_mapping",
         help=("""
             File that maps Augustus datasets to NCBI TaxIDs. See
@@ -67,7 +69,7 @@ def parse_args() -> Namespace:
         type=Path,
     )
 
-    ref_group.add_argument(
+    _ = ref_group.add_argument(
         "--oatk_taxid_file",
         required=True,
         help=("""
@@ -77,7 +79,7 @@ def parse_args() -> Namespace:
         type=Path,
     )
 
-    ref_group.add_argument(
+    _ = ref_group.add_argument(
         "--tiberius_map_file",
         required=True,
         help=("""
@@ -86,7 +88,7 @@ def parse_args() -> Namespace:
         type=Path,
     )
 
-    options_group.add_argument(
+    _ = options_group.add_argument(
         "--cache_dir",
         help=("""
             Directory to cache the NCBI taxonomy after processing
